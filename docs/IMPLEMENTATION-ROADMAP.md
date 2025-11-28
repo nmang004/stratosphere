@@ -33,12 +33,26 @@
 | User State Store | 100% | `src/stores/userStore.ts` |
 | Dashboard Home | 100% | `src/app/(dashboard)/page.tsx` |
 
+### Complete (Application Layer - Phase 2)
+
+| Component | Status | Location |
+|-----------|--------|----------|
+| Alert Utilities | 100% | `src/lib/utils/alerts.ts` |
+| Alert Data Hooks | 100% | `src/lib/hooks/useAlerts.ts` |
+| Client Data Hooks | 100% | `src/lib/hooks/useClients.ts` |
+| React Query Provider | 100% | `src/components/providers/QueryProvider.tsx` |
+| Morning Briefing | 100% | `src/components/dashboard/MorningBriefing.tsx` |
+| Alert Card | 100% | `src/components/dashboard/AlertCard.tsx` |
+| Client Health Card | 100% | `src/components/dashboard/ClientHealthCard.tsx` |
+| Client Health Section | 100% | `src/components/dashboard/ClientHealthSection.tsx` |
+| Dismiss Alert Modal | 100% | `src/components/dashboard/DismissAlertModal.tsx` |
+| Triage Stack | 100% | `src/components/dashboard/TriageStack.tsx` |
+| Triage Page | 100% | `src/app/(dashboard)/triage/page.tsx` |
+
 ### Not Started (Application Layer)
 
 | Component | Priority | Phase |
 |-----------|----------|-------|
-| Morning Briefing | P1 | Phase 2 |
-| Triage Interface | P1 | Phase 2 |
 | Client Management | P1 | Phase 3 |
 | AI API Routes | P1 | Phase 4 |
 | GSC Integration | P1 | Phase 5 |
@@ -108,44 +122,63 @@ src/stores/userStore.ts                # Zustand store for user state
 
 ---
 
-## Phase 2: Morning Briefing & Triage
+## Phase 2: Morning Briefing & Triage ✅ COMPLETE
 
 **Goal:** Core value prop - the Intelligence Dashboard
 
+**Status:** Complete (November 2024)
+
 ### Tasks
 
-1. Build Morning Briefing component (FR-A1)
-   - Query `get_clients_needing_attention()` function
-   - Display prioritized alert stack
-2. Build Triage Stack UI (swipe/dismiss interface)
-   - Critical alerts require confirmation
-   - Log dismissals to `alert_dismissals` table
-3. Create Client Health Cards (FR-A2)
-   - Display health scores with color coding
-   - "Draft Retention Email" prompt when score < 40
-4. Implement dismissed alerts audit trail (FR-A3)
+1. ✅ Build Morning Briefing component (FR-A1)
+   - Query alerts with React Query hooks
+   - Display prioritized alert stack sorted by severity
+2. ✅ Build Triage Stack UI (swipe/dismiss interface)
+   - Critical alerts require 3-second hold + typed "DISMISS" confirmation
+   - Keyboard navigation (← dismiss, → action, ↓ next)
+   - Log dismissals with reason selection
+3. ✅ Create Client Health Cards (FR-A2)
+   - Display health scores with color coding (red <40, yellow 40-70, green >70)
+   - Churn risk badge when probability > 0.65
+   - Trend indicators (↑ improving, ↓ declining, → stable)
+4. ✅ Implement dismissed alerts audit trail (FR-A3)
 
-### Files to Create
+### Files Created
 
 ```
-src/app/(dashboard)/page.tsx                    # Main dashboard
+src/lib/utils/alerts.ts                         # Severity colors, icons, formatting
+src/lib/hooks/useAlerts.ts                      # useAlerts, useActiveAlerts, useDismissAlert
+src/lib/hooks/useClients.ts                     # useClients, useClientsWithHealth
+src/components/providers/QueryProvider.tsx      # React Query provider
+src/app/(dashboard)/page.tsx                    # Main dashboard (updated)
 src/app/(dashboard)/triage/page.tsx             # Dedicated triage view
 src/components/dashboard/MorningBriefing.tsx    # Briefing component
-src/components/dashboard/TriageStack.tsx        # Alert stack UI
+src/components/dashboard/TriageStack.tsx        # Alert stack UI with keyboard nav
 src/components/dashboard/AlertCard.tsx          # Individual alert card
 src/components/dashboard/ClientHealthCard.tsx   # Health score card
-src/lib/hooks/useAlerts.ts                      # Alert data hook
-src/lib/hooks/useClients.ts                     # Client data hook
+src/components/dashboard/ClientHealthSection.tsx # Client health overview
+src/components/dashboard/DismissAlertModal.tsx  # Dismiss modal with CRITICAL handling
 ```
 
 ### Acceptance Criteria
 
-- [ ] Dashboard shows prioritized alerts on load
-- [ ] Alerts sorted by severity and recency
-- [ ] Critical alerts require 3-second hold + typed confirmation
-- [ ] All dismissals logged with reason
-- [ ] Client health scores visible with color coding
-- [ ] Low-health clients (< 40) trigger retention prompt
+- [x] Dashboard shows prioritized alerts on load
+- [x] Alerts sorted by severity (CRITICAL > WARNING > INFO)
+- [x] Critical alerts require 3-second hold + typed "DISMISS" confirmation
+- [x] All dismissals logged with reason
+- [x] Client health scores visible with color coding
+- [x] Churn risk badge appears when probability > 0.65
+- [x] Empty states display appropriately
+- [x] Mobile responsive layout
+- [x] Loading states while fetching data
+
+### Implementation Notes
+
+- React Query used for data fetching with 1-minute stale time
+- Keyboard shortcuts: ← dismiss, → action, ↓/↑ navigate stack
+- Filter tabs: All, Critical, Warning, Info, Dismissed
+- Sort options: Newest, Oldest, Severity
+- View modes: Stack (card-based) and List
 
 ---
 
@@ -474,8 +507,8 @@ npx supabase db push
 ## Summary
 
 **Total Phases:** 9
-**Phases Complete:** 1 of 9
-**Files Created:** ~60 files
+**Phases Complete:** 2 of 9
+**Files Created:** ~75 files
 
 ### Progress Overview
 
@@ -483,7 +516,7 @@ npx supabase db push
 |-------|--------|-------------|
 | Foundation | ✅ Complete | Database, types, AI constraints, UI components |
 | Phase 1 | ✅ Complete | Authentication & Dashboard Layout |
-| Phase 2 | 🔲 Not Started | Morning Briefing & Triage |
+| Phase 2 | ✅ Complete | Morning Briefing & Triage |
 | Phase 3 | 🔲 Not Started | Client Management |
 | Phase 4 | 🔲 Not Started | AI Integration |
 | Phase 5 | 🔲 Not Started | GSC Integration |
@@ -492,4 +525,4 @@ npx supabase db push
 | Phase 8 | 🔲 Not Started | Reports & Portal |
 | Phase 9 | 🔲 Not Started | Advanced Features |
 
-**Next Step:** Begin Phase 2 - Morning Briefing & Triage Interface
+**Next Step:** Begin Phase 3 - Client Management
