@@ -4,7 +4,7 @@
  * AIChatPanel Component
  *
  * Floating chat interface for AI assistance.
- * Supports streaming responses and client context.
+ * Supports streaming responses, client context, and conversation history.
  */
 
 import { useState, useRef, useEffect, useCallback } from 'react'
@@ -18,6 +18,7 @@ import {
   User,
   Loader2,
   Sparkles,
+  Plus,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -36,12 +37,20 @@ import {
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { AIConstraintWarnings, parseWarnings } from './AIConstraintWarnings'
+import { ChatHistory } from './ChatHistory'
 import { cn } from '@/lib/utils'
 
 interface Message {
   id: string
   role: 'user' | 'assistant'
   content: string
+}
+
+interface ConversationMessage {
+  id: string
+  role: 'user' | 'assistant' | 'system'
+  content: string
+  created_at: string
 }
 
 // Rotating thinking messages
@@ -86,8 +95,83 @@ export function AIChatPanel({
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null)
   const [warnings, setWarnings] = useState<string[]>([])
   const [thinkingIndex, setThinkingIndex] = useState(0)
+  const [conversationId, setConversationId] = useState<string | null>(null)
+  const [conversationTitle, setConversationTitle] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+
+  // Create a new conversation
+  const createConversation = useCallback(async (title: string): Promise<string | null> => {
+    try {
+      const response = await fetch('/api/ai/conversations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clientId,
+          title,
+          interactionType,
+        }),
+      })
+
+      if (!response.ok) throw new Error('Failed to create conversation')
+
+      const data = await response.json()
+      return data.conversation.id
+    } catch (err) {
+      console.error('[AIChatPanel] Failed to create conversation:', err)
+      return null
+    }
+  }, [clientId, interactionType])
+
+  // Save a message to the conversation
+  const saveMessage = useCallback(async (convId: string, role: 'user' | 'assistant', content: string) => {
+    try {
+      await fetch(`/api/ai/conversations/${convId}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role, content }),
+      })
+    } catch (err) {
+      console.error('[AIChatPanel] Failed to save message:', err)
+    }
+  }, [])
+
+  // Load a conversation from history
+  const loadConversation = useCallback(async (convId: string) => {
+    try {
+      const response = await fetch(`/api/ai/conversations/${convId}`)
+      if (!response.ok) throw new Error('Failed to load conversation')
+
+      const data = await response.json()
+      const conv = data.conversation
+
+      // Convert database messages to local format
+      const loadedMessages: Message[] = (conv.messages || [])
+        .filter((m: ConversationMessage) => m.role !== 'system')
+        .map((m: ConversationMessage) => ({
+          id: m.id,
+          role: m.role as 'user' | 'assistant',
+          content: m.content,
+        }))
+
+      setConversationId(convId)
+      setConversationTitle(conv.title)
+      setMessages(loadedMessages)
+      setError(null)
+    } catch (err) {
+      console.error('[AIChatPanel] Failed to load conversation:', err)
+      setError('Failed to load conversation')
+    }
+  }, [])
+
+  // Start a new conversation
+  const startNewConversation = useCallback(() => {
+    setConversationId(null)
+    setConversationTitle(null)
+    setMessages([])
+    setError(null)
+    setInput('')
+  }, [])
 
   // Rotate thinking messages while loading
   useEffect(() => {
@@ -132,6 +216,23 @@ export function AIChatPanel({
     setInput('')
     setIsLoading(true)
     setError(null)
+
+    // Create conversation on first message if needed
+    let activeConversationId = conversationId
+    if (!activeConversationId) {
+      // Use first 50 chars of message as title
+      const title = userMessage.content.substring(0, 50) + (userMessage.content.length > 50 ? '...' : '')
+      activeConversationId = await createConversation(title)
+      if (activeConversationId) {
+        setConversationId(activeConversationId)
+        setConversationTitle(title)
+      }
+    }
+
+    // Save user message to database
+    if (activeConversationId) {
+      saveMessage(activeConversationId, 'user', userMessage.content)
+    }
 
     try {
       // Debug: log what we're sending
@@ -199,12 +300,17 @@ export function AIChatPanel({
           })
         }
       }
+
+      // Save assistant message to database after streaming completes
+      if (activeConversationId && assistantContent) {
+        saveMessage(activeConversationId, 'assistant', assistantContent)
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred')
     } finally {
       setIsLoading(false)
     }
-  }, [input, isLoading, clientId, interactionType, messages])
+  }, [input, isLoading, clientId, interactionType, messages, conversationId, createConversation, saveMessage])
 
   const handleCopy = useCallback(async (text: string, idx: number) => {
     await navigator.clipboard.writeText(text)
@@ -237,6 +343,32 @@ export function AIChatPanel({
     <div className="flex flex-col h-full">
       {/* Header options */}
       <div className="p-4 border-b space-y-3">
+        {/* History and New Chat buttons */}
+        <div className="flex items-center justify-between">
+          <ChatHistory
+            onSelectConversation={loadConversation}
+            currentConversationId={conversationId}
+            clientId={clientId}
+            clientFilter={!clientId}
+          />
+          <Button
+            variant="ghost"
+            size="sm"
+            className="gap-1"
+            onClick={startNewConversation}
+          >
+            <Plus className="w-4 h-4" />
+            New Chat
+          </Button>
+        </div>
+
+        {/* Current conversation title */}
+        {conversationTitle && (
+          <div className="text-xs text-muted-foreground truncate">
+            {conversationTitle}
+          </div>
+        )}
+
         {clientName && (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <span>Context:</span>

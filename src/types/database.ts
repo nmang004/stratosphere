@@ -412,6 +412,61 @@ export interface Database {
           feedback_text?: string | null
         }
       }
+      ai_conversations: {
+        Row: {
+          id: string
+          user_id: string
+          client_id: string | null
+          title: string
+          summary: string | null
+          interaction_type: InteractionType
+          message_count: number
+          is_archived: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          client_id?: string | null
+          title?: string
+          summary?: string | null
+          interaction_type?: InteractionType
+          message_count?: number
+          is_archived?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          title?: string
+          summary?: string | null
+          interaction_type?: InteractionType
+          is_archived?: boolean
+          updated_at?: string
+        }
+      }
+      ai_messages: {
+        Row: {
+          id: string
+          conversation_id: string
+          role: 'user' | 'assistant' | 'system'
+          content: string
+          tokens_used: number | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          conversation_id: string
+          role: 'user' | 'assistant' | 'system'
+          content: string
+          tokens_used?: number | null
+          created_at?: string
+        }
+        Update: {
+          content?: string
+          tokens_used?: number | null
+        }
+      }
       client_touchpoints: {
         Row: {
           id: string
@@ -515,6 +570,29 @@ export interface Database {
           attention_reason: string
         }[]
       }
+      search_conversations: {
+        Args: {
+          p_user_id: string
+          p_search_query?: string | null
+          p_client_id?: string | null
+          p_limit?: number
+          p_offset?: number
+        }
+        Returns: {
+          id: string
+          user_id: string
+          client_id: string | null
+          title: string
+          summary: string | null
+          interaction_type: string
+          message_count: number
+          is_archived: boolean
+          created_at: string
+          updated_at: string
+          client_name: string | null
+          relevance: number
+        }[]
+      }
     }
     Enums: {
       user_role: UserRole
@@ -554,6 +632,10 @@ export type ChurnPrediction = Database['public']['Tables']['churn_prediction_sco
 export type CalendarEvent = Database['public']['Tables']['calendar_events']['Row']
 export type GscAggregate = Database['public']['Tables']['gsc_aggregates']['Row']
 export type AiInteractionLog = Database['public']['Tables']['ai_interaction_logs']['Row']
+export type AiConversation = Database['public']['Tables']['ai_conversations']['Row']
+export type AiConversationInsert = Database['public']['Tables']['ai_conversations']['Insert']
+export type AiMessage = Database['public']['Tables']['ai_messages']['Row']
+export type AiMessageInsert = Database['public']['Tables']['ai_messages']['Insert']
 export type ClientTouchpoint = Database['public']['Tables']['client_touchpoints']['Row']
 export type ClientTouchpointInsert = Database['public']['Tables']['client_touchpoints']['Insert']
 export type ClientContract = Database['public']['Tables']['client_contracts']['Row']
@@ -586,4 +668,34 @@ export interface ClientDetail extends Client {
     custom_inclusions: string[]
   } | null
   active_alert_count?: number
+}
+
+// Conversation with messages and client info
+export interface ConversationWithMessages extends AiConversation {
+  messages: AiMessage[]
+  client?: {
+    id: string
+    name: string
+  } | null
+}
+
+// Conversation list item (for sidebar/list view)
+export interface ConversationListItem extends AiConversation {
+  client_name?: string | null
+}
+
+// Search result for conversations
+export interface ConversationSearchResult {
+  id: string
+  user_id: string
+  client_id: string | null
+  title: string
+  summary: string | null
+  interaction_type: string
+  message_count: number
+  is_archived: boolean
+  created_at: string
+  updated_at: string
+  client_name: string | null
+  relevance: number
 }
