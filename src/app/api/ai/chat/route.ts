@@ -33,20 +33,24 @@ const interactionTypeToPromptType: Record<string, keyof typeof import('@/lib/ai/
 // Additional instructions to prevent code/tool output and use provided data
 const NO_CODE_INSTRUCTION = `
 
-CRITICAL OUTPUT RULES - YOU MUST FOLLOW THESE:
-- Respond ONLY with natural language text - no exceptions
-- NEVER output code blocks, function calls, tool invocations, or any code syntax
-- NEVER use markdown code fences
-- NEVER pretend to call functions or fetch data
-- You do NOT have access to any tools, functions, or external systems
+ABSOLUTE RULES - VIOLATION WILL CAUSE SYSTEM FAILURE:
+1. You are a TEXT-ONLY assistant. Output ONLY plain English paragraphs and bullet points.
+2. You have ZERO tools, ZERO functions, ZERO code execution ability.
+3. FORBIDDEN outputs that will crash the system:
+   - \`\`\` (code fences)
+   - tool_code, print(), get_*, fetch_*, or ANY function syntax
+   - Python, JavaScript, or any programming language
+4. The client data is ALREADY PROVIDED below - use it directly in your response.
+5. Start your response with analysis, NOT with asking for data.
+6. If data shows "N/A" or "No data", work with what IS available.
 
-DATA USAGE RULES:
-- USE the client data provided in [CLIENT DATA] section - it contains all available metrics
-- DO NOT ask for data that is already provided in the context
-- If GSC metrics show "No GSC data available", acknowledge this and work with available health scores
-- The pre-computed delta percentages (clicks_delta_pct, impressions_delta_pct, position_delta) are already calculated - use them directly
-- Provide actionable analysis based on the data you have
-- If specific data is truly missing, briefly note it but still provide value with available information`
+CORRECT RESPONSE FORMAT:
+"Based on the health score of X and the Y% change in traffic, I recommend..."
+
+WRONG (will crash):
+\`\`\`tool_code
+print(get_data())
+\`\`\``
 
 export async function POST(request: NextRequest) {
   try {
@@ -84,35 +88,44 @@ export async function POST(request: NextRequest) {
     const style = requestContext.user.profile?.account_manager_style || 'COLLABORATIVE'
     const promptType = interactionTypeToPromptType[interactionType]
 
-    let additionalContext = ''
+    // Debug logging
+    console.log('[AI Chat] clientId received:', clientId)
+    console.log('[AI Chat] clientContext exists:', !!requestContext.clientContext)
 
-    // Add client context if available (with enriched metrics data)
+    // Build client data context separately from system instructions
+    let clientDataContext = ''
     if (requestContext.clientContext) {
-      additionalContext = formatEnrichedContextForPrompt(requestContext.clientContext)
+      clientDataContext = formatEnrichedContextForPrompt(requestContext.clientContext)
+      console.log('[AI Chat] Client context formatted, length:', clientDataContext.length)
+    } else {
+      console.log('[AI Chat] No client context available')
     }
 
-    // Add any warnings to context
+    // Add warnings to client context if any
     if (requestContext.warnings.length > 0) {
-      additionalContext += `\n\n## Active Warnings\n${requestContext.warnings.map(w => `- ${w}`).join('\n')}`
+      clientDataContext += `\n\n## Active Warnings\n${requestContext.warnings.map(w => `- ${w}`).join('\n')}`
     }
 
-    // Add the no-code instruction
-    additionalContext += NO_CODE_INSTRUCTION
-
+    // System prompt gets the no-code instruction
     const systemPrompt = buildSystemPrompt({
       style,
       interactionType: promptType,
-      additionalContext,
+      additionalContext: NO_CODE_INSTRUCTION,
     })
 
-    // Build the user message with context prepended if available
+    // Build the user message - prepend client data if available
     let userMessageContent = message
-    if (requestContext.clientContext && additionalContext) {
-      userMessageContent = `[CLIENT DATA - USE THIS FOR YOUR ANALYSIS]
-${additionalContext}
+    if (clientDataContext) {
+      userMessageContent = `=== CLIENT DATA FOR ANALYSIS ===
+${clientDataContext}
+=== END CLIENT DATA ===
 
-[USER QUESTION]
-${message}`
+USER REQUEST: ${message}
+
+Please analyze using the client data provided above. Do not ask for data that is already shown.`
+      console.log('[AI Chat] User message includes client data')
+    } else {
+      console.log('[AI Chat] No client data to include in message')
     }
 
     // Build messages array with conversation history
@@ -150,15 +163,38 @@ ${message}`
       },
     })
 
-    // Create a custom readable stream that outputs clean text
+    // Create a custom readable stream that outputs clean text and filters code
     const encoder = new TextEncoder()
+
+    // Function to clean code artifacts from text
+    function cleanCodeArtifacts(text: string): string {
+      return text
+        // Remove ```...``` code blocks
+        .replace(/```[\s\S]*?```/g, '')
+        // Remove inline code with tool_code
+        .replace(/`tool_code[^`]*`/g, '')
+        // Remove print() calls
+        .replace(/print\s*\([^)]*\)/g, '')
+        // Remove get_* function calls
+        .replace(/get_\w+\s*\([^)]*\)/g, '')
+        // Remove lines that are just function calls
+        .replace(/^\s*\w+\s*\([^)]*\)\s*$/gm, '')
+        // Clean up extra newlines
+        .replace(/\n{3,}/g, '\n\n')
+    }
+
+    let fullResponse = ''
+
     const stream = new ReadableStream({
       async start(controller) {
         try {
           for await (const chunk of result.textStream) {
-            // Send each text chunk directly
-            controller.enqueue(encoder.encode(chunk))
+            fullResponse += chunk
           }
+
+          // Clean the full response before sending
+          const cleanedResponse = cleanCodeArtifacts(fullResponse)
+          controller.enqueue(encoder.encode(cleanedResponse))
           controller.close()
         } catch (error) {
           controller.error(error)

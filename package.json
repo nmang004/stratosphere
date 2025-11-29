@@ -38,6 +38,7 @@
     "react-day-picker": "^9.11.2",
     "react-dom": "19.2.0",
     "react-hook-form": "^7.67.0",
+    "react-markdown": "^10.1.0",
     "recharts": "^3.5.1",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.4.0",
@@ -46,6 +47,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@tailwindcss/typography": "^0.5.19",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

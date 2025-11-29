@@ -8,6 +8,7 @@
  */
 
 import { useState, useRef, useEffect, useCallback } from 'react'
+import ReactMarkdown from 'react-markdown'
 import {
   MessageSquare,
   Send,
@@ -107,6 +108,9 @@ export function AIChatPanel({
     setError(null)
 
     try {
+      // Debug: log what we're sending
+      console.log('[AIChatPanel] Sending request with clientId:', clientId)
+
       const response = await fetch('/api/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -269,13 +273,19 @@ export function AIChatPanel({
                 )}
                 <div
                   className={cn(
-                    'max-w-[80%] rounded-lg px-3 py-2 text-sm',
+                    'max-w-[85%] rounded-lg px-3 py-2 text-sm',
                     message.role === 'user'
                       ? 'bg-primary text-primary-foreground'
                       : 'bg-muted'
                   )}
                 >
-                  <div className="whitespace-pre-wrap">{message.content}</div>
+                  {message.role === 'assistant' ? (
+                    <div className="prose prose-sm dark:prose-invert max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0.5 prose-headings:my-2 prose-headings:font-semibold">
+                      <ReactMarkdown>{message.content}</ReactMarkdown>
+                    </div>
+                  ) : (
+                    <div className="whitespace-pre-wrap">{message.content}</div>
+                  )}
                   {message.role === 'assistant' && message.content && (
                     <Button
                       variant="ghost"

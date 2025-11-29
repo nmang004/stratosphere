@@ -159,7 +159,9 @@ export function checkRateLimit(userId: string): { allowed: boolean; retryAfter?:
 export async function fetchClientContext(
   clientId: string,
   userId: string
-): Promise<{ context: ClientAIContext | null; error: string | null }> {
+): Promise<{ context: EnrichedClientContext | null; error: string | null }> {
+  console.log('[AI Middleware] Fetching context for clientId:', clientId, 'userId:', userId)
+
   try {
     // First verify user has access to this client
     const { data: assignment, error: assignmentError } = await serviceClient
@@ -171,19 +173,32 @@ export async function fetchClientContext(
       .single()
 
     if (assignmentError || !assignment) {
+      console.log('[AI Middleware] Assignment check failed:', assignmentError?.message || 'No assignment found')
       return { context: null, error: 'You do not have access to this client' }
     }
+    console.log('[AI Middleware] User has access to client')
 
     // Fetch client
-    const { data: client, error: clientError } = await serviceClient
+    const { data: clientRaw, error: clientError } = await serviceClient
       .from('clients')
       .select('*')
       .eq('id', clientId)
       .single()
 
-    if (clientError || !client) {
+    if (clientError || !clientRaw) {
+      console.log('[AI Middleware] Client fetch failed:', clientError?.message || 'Client not found')
       return { context: null, error: 'Client not found' }
     }
+
+    const client = clientRaw as {
+      id: string
+      name: string
+      domain: string
+      industry: string | null
+      risk_score: number | null
+      brand_voice_guidelines: string | null
+    }
+    console.log('[AI Middleware] Client found:', client.name)
 
     // Fetch entitlements with tier
     const { data: entitlementsRaw } = await serviceClient
@@ -219,12 +234,18 @@ export async function fetchClientContext(
       .single()
 
     // Fetch latest health history (last 7 days for trend)
-    const { data: healthHistoryRaw } = await serviceClient
+    const { data: healthHistoryRaw, error: healthError } = await serviceClient
       .from('client_health_history')
       .select('*')
       .eq('client_id', clientId)
       .order('recorded_date', { ascending: false })
       .limit(7)
+
+    console.log('[AI Middleware] Health history query result:', {
+      error: healthError?.message,
+      count: healthHistoryRaw?.length,
+      sample: healthHistoryRaw?.[0],
+    })
 
     const healthHistory = healthHistoryRaw as Array<{
       recorded_date: string
@@ -342,12 +363,20 @@ export async function fetchClientContext(
     )
 
     // Add enriched data to context for AI
-    const enrichedContext = {
+    const enrichedContext: EnrichedClientContext = {
       ...context,
       health_history: healthHistory,
       gsc_metrics: gscAggregates,
       active_alerts: activeAlerts,
     }
+
+    console.log('[AI Middleware] Context built successfully:', {
+      client_name: enrichedContext.client_name,
+      health_score: enrichedContext.health_score,
+      has_health_history: !!healthHistory?.length,
+      has_gsc_metrics: !!gscAggregates?.length,
+      has_alerts: !!activeAlerts?.length,
+    })
 
     return { context: enrichedContext, error: null }
   } catch (err) {
