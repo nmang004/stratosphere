@@ -76,6 +76,7 @@ export interface Database {
           name: string
           domain: string
           gsc_property_url: string | null
+          gsc_tokens: Json | null
           risk_score: number | null
           brand_voice_guidelines: string | null
           industry: string | null
@@ -91,6 +92,7 @@ export interface Database {
           name: string
           domain: string
           gsc_property_url?: string | null
+          gsc_tokens?: Json | null
           risk_score?: number | null
           brand_voice_guidelines?: string | null
           industry?: string | null
@@ -105,6 +107,7 @@ export interface Database {
           name?: string
           domain?: string
           gsc_property_url?: string | null
+          gsc_tokens?: Json | null
           risk_score?: number | null
           brand_voice_guidelines?: string | null
           industry?: string | null
@@ -535,6 +538,58 @@ export interface Database {
           renewal_notice_days?: number | null
           contract_terms?: string | null
           updated_at?: string
+        }
+      }
+      gsc_cache_logs: {
+        Row: {
+          id: string
+          client_id: string
+          endpoint_signature: string
+          data_payload: Json
+          row_count: number | null
+          created_at: string
+          expires_at: string
+        }
+        Insert: {
+          id?: string
+          client_id: string
+          endpoint_signature: string
+          data_payload: Json
+          row_count?: number | null
+          created_at?: string
+          expires_at: string
+        }
+        Update: {
+          data_payload?: Json
+          row_count?: number | null
+          created_at?: string
+          expires_at?: string
+        }
+      }
+      api_quota_tracking: {
+        Row: {
+          id: string
+          client_id: string | null
+          api_type: ApiType
+          quota_date: string
+          allocated_quota: number
+          used_quota: number
+          reserved_quota: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          client_id?: string | null
+          api_type: ApiType
+          quota_date: string
+          allocated_quota: number
+          used_quota?: number
+          reserved_quota?: number
+          created_at?: string
+        }
+        Update: {
+          used_quota?: number
+          reserved_quota?: number
         }
       }
     }

@@ -28,7 +28,7 @@ const TABS = [
   { value: 'health', label: 'Health History', href: '/health' },
   { value: 'touchpoints', label: 'Touchpoints', href: '/touchpoints' },
   { value: 'serp', label: 'SERP Analysis', href: '/serp' },
-  { value: 'gsc', label: 'GSC Data', href: '/gsc', disabled: true },
+  { value: 'gsc', label: 'Search Console', href: '/gsc' },
   { value: 'experiments', label: 'Experiments', href: '/experiments', disabled: true },
 ]
 
