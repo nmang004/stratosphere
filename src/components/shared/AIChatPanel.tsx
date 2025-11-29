@@ -44,6 +44,17 @@ interface Message {
   content: string
 }
 
+// Rotating thinking messages
+const THINKING_MESSAGES = [
+  'Thinking...',
+  'Analyzing data...',
+  'Brainstorming...',
+  'Reviewing metrics...',
+  'Formulating insights...',
+  'Crafting recommendations...',
+  'Almost there...',
+]
+
 interface AIChatPanelProps {
   clientId?: string
   clientName?: string
@@ -74,8 +85,23 @@ export function AIChatPanel({
   const [error, setError] = useState<string | null>(null)
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null)
   const [warnings, setWarnings] = useState<string[]>([])
+  const [thinkingIndex, setThinkingIndex] = useState(0)
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+
+  // Rotate thinking messages while loading
+  useEffect(() => {
+    if (!isLoading) {
+      setThinkingIndex(0)
+      return
+    }
+
+    const interval = setInterval(() => {
+      setThinkingIndex((prev) => (prev + 1) % THINKING_MESSAGES.length)
+    }, 2000) // Change message every 2 seconds
+
+    return () => clearInterval(interval)
+  }, [isLoading])
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -280,7 +306,7 @@ export function AIChatPanel({
                   )}
                 >
                   {message.role === 'assistant' ? (
-                    <div className="prose prose-sm dark:prose-invert max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0.5 prose-headings:my-2 prose-headings:font-semibold">
+                    <div className="prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0.5 prose-headings:my-2 prose-headings:font-semibold prose-p:text-foreground prose-li:text-foreground prose-headings:text-foreground prose-strong:text-foreground text-foreground">
                       <ReactMarkdown>{message.content}</ReactMarkdown>
                     </div>
                   ) : (
@@ -314,13 +340,16 @@ export function AIChatPanel({
                 )}
               </div>
             ))}
-            {isLoading && messages[messages.length - 1]?.content === '' && (
+            {isLoading && (
               <div className="flex gap-3">
                 <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
                   <Bot className="w-4 h-4 text-primary" />
                 </div>
-                <div className="bg-muted rounded-lg px-3 py-2">
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                <div className="bg-muted rounded-lg px-3 py-3 flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                  <span className="text-sm text-foreground animate-pulse">
+                    {THINKING_MESSAGES[thinkingIndex]}
+                  </span>
                 </div>
               </div>
             )}
