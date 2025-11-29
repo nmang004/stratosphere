@@ -1,190 +1,83 @@
-import { Suspense } from 'react'
-import { createClient } from '@/lib/supabase/server'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
-import { Skeleton } from '@/components/ui/skeleton'
-import { Users, AlertCircle, Activity, Calendar } from 'lucide-react'
-import { MorningBriefing, MorningBriefingSkeleton } from '@/components/dashboard/MorningBriefing'
-import { ClientHealthSection } from '@/components/dashboard/ClientHealthSection'
-import type { AlertSeverity } from '@/types/database'
+'use client';
 
-function getGreeting(): string {
-  const hour = new Date().getHours()
-  if (hour < 12) return 'Good morning'
-  if (hour < 17) return 'Good afternoon'
-  return 'Good evening'
-}
+/**
+ * Stratosphere Forensics Console
+ *
+ * Main page - Ticket Command Center for analyzing AM support tickets.
+ */
 
-async function getDashboardStats(supabase: Awaited<ReturnType<typeof createClient>>) {
-  // Fetch client count
-  const { count: clientCount } = await supabase
-    .from('clients')
-    .select('*', { count: 'exact', head: true })
-    .eq('is_active', true)
+import { useState } from 'react';
+import { TicketInputPanel } from '@/components/forensics/TicketInputPanel';
+import { ResultsPanel } from '@/components/forensics/ResultsPanel';
+import type { AnalyzeTicketRequest, AnalyzeTicketResponse, AMPersona } from '@/lib/ai/types';
 
-  // Fetch alert counts
-  const { data: alertsData } = await supabase
-    .from('alerts')
-    .select('severity, is_dismissed')
-    .eq('is_dismissed', false)
+export default function ForensicsConsolePage() {
+  const [result, setResult] = useState<AnalyzeTicketResponse | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [currentPersona, setCurrentPersona] = useState<AMPersona>('PANIC_PATTY');
 
-  const alerts = alertsData as { severity: AlertSeverity; is_dismissed: boolean }[] | null
-  const criticalCount = alerts?.filter((a) => a.severity === 'CRITICAL').length ?? 0
-  const totalAlerts = alerts?.length ?? 0
+  const handleSubmit = async (request: AnalyzeTicketRequest) => {
+    setIsLoading(true);
+    setError(null);
+    setResult(null);
+    setCurrentPersona(request.amPersona);
 
-  // Calculate average health score
-  const { data: healthDataRaw } = await supabase
-    .from('client_health_history')
-    .select('health_score, client_id')
-    .order('recorded_date', { ascending: false })
+    try {
+      const response = await fetch('/api/ai/analyze-ticket', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(request),
+      });
 
-  const healthData = healthDataRaw as { health_score: number | null; client_id: string }[] | null
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to analyze ticket');
+      }
 
-  // Get latest health score per client
-  const latestScores = new Map<string, number>()
-  healthData?.forEach((h) => {
-    if (!latestScores.has(h.client_id) && h.health_score !== null) {
-      latestScores.set(h.client_id, h.health_score)
+      const data: AnalyzeTicketResponse = await response.json();
+      setResult(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An unexpected error occurred');
+    } finally {
+      setIsLoading(false);
     }
-  })
-
-  const avgHealthScore =
-    latestScores.size > 0
-      ? Math.round(
-          Array.from(latestScores.values()).reduce((a, b) => a + b, 0) /
-            latestScores.size
-        )
-      : 0
-
-  return {
-    clientCount: clientCount ?? 0,
-    criticalCount,
-    totalAlerts,
-    avgHealthScore,
-  }
-}
-
-export default async function DashboardPage() {
-  const supabase = await createClient()
-
-  // Get the authenticated user
-  const { data: { user } } = await supabase.auth.getUser()
-
-  // Fetch user profile
-  let displayName = 'there'
-  if (user) {
-    const { data: userProfileData } = await supabase
-      .from('user_profiles')
-      .select('display_name')
-      .eq('id', user.id)
-      .single()
-    const userProfile = userProfileData as { display_name: string } | null
-    displayName = userProfile?.display_name || 'there'
-  }
-
-  // Fetch dashboard stats
-  const stats = await getDashboardStats(supabase)
-
-  const greeting = getGreeting()
+  };
 
   return (
-    <div className="space-y-6">
-      {/* Welcome message */}
-      <div>
-        <h2 className="text-2xl font-bold tracking-tight">
-          {greeting}, {displayName}
-        </h2>
+    <div className="h-full">
+      {/* Header */}
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold tracking-tight">
+          Forensics Console
+        </h1>
         <p className="text-muted-foreground">
-          Here&apos;s what&apos;s happening with your clients today.
+          Analyze AM tickets and generate strategic responses using the Ranking 2.0 Handbook.
         </p>
       </div>
 
-      {/* Quick stats row */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardDescription>Active Clients</CardDescription>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.clientCount}</div>
-          </CardContent>
-        </Card>
+      {/* Error Display */}
+      {error && (
+        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
+          <p className="font-medium">Error</p>
+          <p className="text-sm">{error}</p>
+        </div>
+      )}
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardDescription>Critical Alerts</CardDescription>
-            <AlertCircle className="h-4 w-4 text-red-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-500">
-              {stats.criticalCount}
-            </div>
-            {stats.totalAlerts > stats.criticalCount && (
-              <p className="text-xs text-muted-foreground">
-                +{stats.totalAlerts - stats.criticalCount} other alerts
-              </p>
-            )}
-          </CardContent>
-        </Card>
+      {/* Main Content - Split View */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[calc(100vh-200px)]">
+        {/* Left Panel - Input */}
+        <div className="overflow-auto">
+          <TicketInputPanel onSubmit={handleSubmit} isLoading={isLoading} />
+        </div>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardDescription>Avg Health Score</CardDescription>
-            <Activity className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.avgHealthScore}</div>
-            <p className="text-xs text-muted-foreground">across all clients</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardDescription>This Week</CardDescription>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalAlerts}</div>
-            <p className="text-xs text-muted-foreground">alerts to review</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Content grid */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Morning Briefing */}
-        <Suspense fallback={<MorningBriefingSkeleton />}>
-          <MorningBriefing maxAlerts={5} />
-        </Suspense>
-
-        {/* Client Health Overview */}
-        <Suspense
-          fallback={
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="h-5 w-5" />
-                  Client Health
-                </CardTitle>
-                <CardDescription>Clients needing attention</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <Skeleton className="h-16 w-full" />
-                <Skeleton className="h-16 w-full" />
-                <Skeleton className="h-16 w-full" />
-              </CardContent>
-            </Card>
-          }
-        >
-          <ClientHealthSection />
-        </Suspense>
+        {/* Right Panel - Results */}
+        <div className="overflow-auto">
+          <ResultsPanel result={result} persona={currentPersona} />
+        </div>
       </div>
     </div>
-  )
+  );
 }

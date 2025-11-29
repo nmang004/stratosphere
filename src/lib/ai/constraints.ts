@@ -1,286 +1,295 @@
 /**
- * Stratosphere AI Constraint Helpers
+ * Stratosphere AI Constraint Helpers - Forensics Edition
  *
- * Utility functions for enforcing AI constraints and building context.
+ * Utility functions for enforcing Handbook constraints.
  */
 
-import type { Json } from '@/types/database'
+import { HANDBOOK_RULES } from '../forensics/constants';
+import type { PageMetadata, NineMonthCheck } from './types';
+
+// =============================================================================
+// 9-MONTH RULE ENFORCEMENT
+// =============================================================================
 
 /**
- * Data threshold check result
+ * Check if a page is locked by the 9-Month Rule.
+ * Returns detailed check result with reason.
  */
-export interface DataThresholdResult {
-  days_of_data: number
-  has_minimum: boolean
-  minimum_required: number
-  first_date: string | null
-  last_date: string | null
-  confidence_level: 'VERY_HIGH' | 'HIGH' | 'MEDIUM' | 'LOW'
-  recommendation: string
-}
-
-/**
- * Cache freshness check result
- */
-export interface CacheFreshnessResult {
-  has_cache: boolean
-  last_sync?: string
-  hours_old?: number
-  is_stale: boolean
-  recommendation: string
-}
-
-/**
- * Client context for AI interactions
- */
-export interface ClientAIContext {
-  client_id: string
-  client_name: string
-  industry: string | null
-  health_score: number | null
-  churn_probability: number | null
-  churn_risk_level: 'HIGH' | 'MEDIUM' | 'LOW' | 'NONE'
-  service_tier: string | null
-  included_services: string[]
-  excluded_services: string[]
-  data_threshold: DataThresholdResult | null
-  cache_freshness: CacheFreshnessResult | null
-  brand_voice?: string | null
-  recent_events: string[]
-  active_alerts_count: number
-  days_since_touchpoint: number | null
-}
-
-/**
- * Determines churn risk level based on probability
- */
-export function getChurnRiskLevel(probability: number | null): 'HIGH' | 'MEDIUM' | 'LOW' | 'NONE' {
-  if (probability === null) return 'NONE'
-  if (probability >= 0.65) return 'HIGH'
-  if (probability >= 0.4) return 'MEDIUM'
-  if (probability >= 0.2) return 'LOW'
-  return 'NONE'
-}
-
-/**
- * Builds the churn warning prefix if needed
- */
-export function buildChurnWarning(probability: number | null): string | null {
-  if (probability === null || probability < 0.65) return null
-
-  const percentage = Math.round(probability * 100)
-  return `[RETENTION ALERT] This client shows elevated churn risk (${percentage}%). Consider prioritizing engagement and scheduling a check-in call.`
-}
-
-/**
- * Builds data quality warning if needed
- */
-export function buildDataQualityWarning(
-  threshold: DataThresholdResult | null,
-  freshness: CacheFreshnessResult | null
-): string | null {
-  const warnings: string[] = []
-
-  if (threshold && !threshold.has_minimum) {
-    warnings.push(
-      `Insufficient data for trend analysis (${threshold.days_of_data} days available, ${threshold.minimum_required} required).`
-    )
+export function checkNineMonthRule(pageMetadata?: PageMetadata): NineMonthCheck {
+  if (!pageMetadata) {
+    return {
+      isLocked: false,
+      reason: 'No page metadata provided - assuming eligible for optimization',
+    };
   }
 
-  if (freshness && freshness.is_stale && freshness.hours_old) {
-    warnings.push(
-      `Data is ${Math.round(freshness.hours_old)} hours old. Consider requesting a manual refresh.`
-    )
+  const now = new Date();
+
+  // Check creation date (6 month lockout)
+  if (pageMetadata.createdDate) {
+    const created = new Date(pageMetadata.createdDate);
+    const monthsSinceCreation = monthsBetween(created, now);
+
+    if (monthsSinceCreation < HANDBOOK_RULES.NEW_PAGE_LOCKOUT_MONTHS) {
+      return {
+        isLocked: true,
+        reason: `Page created ${monthsSinceCreation.toFixed(1)} months ago (requires ${HANDBOOK_RULES.NEW_PAGE_LOCKOUT_MONTHS} months)`,
+      };
+    }
   }
 
-  return warnings.length > 0 ? warnings.join(' ') : null
-}
+  // Check last optimization date (9 month lockout)
+  if (pageMetadata.lastOptimizationDate) {
+    const lastOpt = new Date(pageMetadata.lastOptimizationDate);
+    const monthsSinceOptimization = monthsBetween(lastOpt, now);
 
-/**
- * Checks if a service is included in client's entitlements
- */
-export function isServiceEntitled(
-  service: string,
-  includedServices: string[],
-  excludedServices: string[]
-): boolean {
-  // Check explicit exclusions first
-  if (excludedServices.includes(service)) return false
-
-  // Then check inclusions
-  return includedServices.includes(service)
-}
-
-/**
- * Builds the service scope message for AI context
- */
-export function buildScopeContext(
-  includedServices: string[],
-  excludedServices: string[]
-): string {
-  return `
-Available services for this client:
-- Included: ${includedServices.join(', ') || 'None specified'}
-- Excluded: ${excludedServices.join(', ') || 'None'}
-
-Only recommend or promise work that falls within included services.
-If the client requests excluded services, suggest discussing a tier upgrade.`
-}
-
-/**
- * Formats calendar events context for AI
- */
-export function formatEventsContext(events: Array<{
-  event_name: string
-  event_type: string
-  event_date: string
-  impact_category?: string | null
-}>): string {
-  if (events.length === 0) {
-    return 'No relevant calendar events in the analysis period.'
+    if (monthsSinceOptimization < HANDBOOK_RULES.OPTIMIZATION_LOCKOUT_MONTHS) {
+      return {
+        isLocked: true,
+        reason: `Last optimized ${monthsSinceOptimization.toFixed(1)} months ago (requires ${HANDBOOK_RULES.OPTIMIZATION_LOCKOUT_MONTHS} months)`,
+      };
+    }
   }
-
-  const eventLines = events.map(e => {
-    const impact = e.impact_category ? ` (${e.impact_category} impact)` : ''
-    return `- ${e.event_date}: ${e.event_name} [${e.event_type}]${impact}`
-  })
-
-  return `Relevant calendar events:\n${eventLines.join('\n')}`
-}
-
-/**
- * Builds the complete AI context object for a client interaction
- */
-export function buildClientContext(
-  client: {
-    id: string
-    name: string
-    industry: string | null
-    risk_score: number | null
-    brand_voice_guidelines: string | null
-  },
-  entitlements: {
-    tier_name: string | null
-    included_services: string[]
-    custom_exclusions: string[]
-    custom_inclusions: string[]
-  } | null,
-  churnPrediction: { churn_probability: number | null } | null,
-  dataThreshold: DataThresholdResult | null,
-  cacheFreshness: CacheFreshnessResult | null,
-  calendarEvents: Array<{ event_name: string; event_type: string; event_date: string }>,
-  alertsCount: number,
-  daysSinceTouchpoint: number | null
-): ClientAIContext {
-  const included = [
-    ...(entitlements?.included_services || []),
-    ...(entitlements?.custom_inclusions || [])
-  ]
-  const excluded = entitlements?.custom_exclusions || []
 
   return {
-    client_id: client.id,
-    client_name: client.name,
-    industry: client.industry,
-    health_score: client.risk_score,
-    churn_probability: churnPrediction?.churn_probability ?? null,
-    churn_risk_level: getChurnRiskLevel(churnPrediction?.churn_probability ?? null),
-    service_tier: entitlements?.tier_name ?? null,
-    included_services: included,
-    excluded_services: excluded,
-    data_threshold: dataThreshold,
-    cache_freshness: cacheFreshness,
-    brand_voice: client.brand_voice_guidelines,
-    recent_events: calendarEvents.map(e => `${e.event_date}: ${e.event_name}`),
-    active_alerts_count: alertsCount,
-    days_since_touchpoint: daysSinceTouchpoint,
-  }
+    isLocked: false,
+    reason: 'Eligible for optimization',
+  };
 }
 
 /**
- * Formats the client context for inclusion in AI prompts
+ * Calculate months between two dates.
  */
-export function formatContextForPrompt(context: ClientAIContext): string {
-  const sections: string[] = []
+function monthsBetween(date1: Date, date2: Date): number {
+  const years = date2.getFullYear() - date1.getFullYear();
+  const months = date2.getMonth() - date1.getMonth();
+  const days = date2.getDate() - date1.getDate();
 
-  // Client basics
-  sections.push(`## Client Context
-- Name: ${context.client_name}
-- Industry: ${context.industry || 'Not specified'}
-- Health Score: ${context.health_score ?? 'N/A'}/100
-- Service Tier: ${context.service_tier || 'Not specified'}`)
+  return years * 12 + months + (days / 30);
+}
 
-  // Churn warning (CRITICAL - must come early)
-  const churnWarning = buildChurnWarning(context.churn_probability)
-  if (churnWarning) {
-    sections.unshift(churnWarning) // Put at the very top
+// =============================================================================
+// PAGE TYPE DETECTION
+// =============================================================================
+
+/**
+ * Detect if a URL is a generic page or geo-specific.
+ */
+export function detectPageType(url: string): 'GENERIC' | 'GEO' | 'SERVICE' | 'HOMEPAGE' | 'UNKNOWN' {
+  const path = url.toLowerCase();
+
+  // Homepage detection
+  if (path === '/' || path.endsWith('.com') || path.endsWith('.com/')) {
+    return 'HOMEPAGE';
   }
 
-  // Data quality warnings
-  const dataWarning = buildDataQualityWarning(context.data_threshold, context.cache_freshness)
-  if (dataWarning) {
-    sections.push(`## Data Quality Notice\n${dataWarning}`)
+  // Geo-specific patterns
+  const geoPatterns = [
+    /\/locations?\//,
+    /\/areas?-we-serve/,
+    /\/service-areas?/,
+    /\/cities?\//,
+    /\/(plumber|lawyer|dentist|doctor)s?-in-/,
+    /-near-me/,
+    /\/[a-z]+-[a-z]{2}\// // city-state pattern like /austin-tx/
+  ];
+
+  for (const pattern of geoPatterns) {
+    if (pattern.test(path)) {
+      return 'GEO';
+    }
   }
 
-  // Service entitlements
-  sections.push(buildScopeContext(context.included_services, context.excluded_services))
+  // Generic service page patterns
+  const genericPatterns = [
+    /^\/(services?|what-we-do)\/?$/,
+    /^\/(plumbing|electrical|hvac|roofing|legal|dental)\/?$/,
+    /^\/[a-z-]+-services?\/?$/,
+  ];
 
-  // Recent events
-  if (context.recent_events.length > 0) {
-    sections.push(`## Recent Calendar Events\n${context.recent_events.map(e => `- ${e}`).join('\n')}`)
+  for (const pattern of genericPatterns) {
+    if (pattern.test(new URL(url).pathname)) {
+      return 'GENERIC';
+    }
   }
 
-  // Engagement status
-  if (context.days_since_touchpoint !== null) {
-    const urgency = context.days_since_touchpoint > 14 ? ' (OVERDUE)' : ''
-    sections.push(`## Engagement Status
-- Days since last touchpoint: ${context.days_since_touchpoint}${urgency}
-- Active alerts: ${context.active_alerts_count}`)
+  // Service-specific (not generic, not geo)
+  if (path.includes('/service') || path.includes('/practice-area')) {
+    return 'SERVICE';
   }
 
-  // Brand voice
-  if (context.brand_voice) {
-    sections.push(`## Brand Voice Guidelines\n${context.brand_voice}`)
-  }
-
-  return sections.join('\n\n')
+  return 'UNKNOWN';
 }
 
 /**
- * Validates that required constraints are present before AI call
+ * Check if a query is geo-targeted.
  */
-export function validatePreAIChecks(context: ClientAIContext): {
-  valid: boolean
-  errors: string[]
-  warnings: string[]
+export function isGeoQuery(query: string): boolean {
+  const geoIndicators = [
+    /\bin\s+[a-z]+/i, // "in Austin"
+    /\bnear\s+(me|[a-z]+)/i, // "near me", "near downtown"
+    /[a-z]+,?\s*[a-z]{2}/i, // "Austin TX", "Austin, TX"
+    /\blocal\b/i,
+    /\barea\b/i,
+  ];
+
+  return geoIndicators.some((pattern) => pattern.test(query));
+}
+
+// =============================================================================
+// MAPPING RULE ENFORCEMENT
+// =============================================================================
+
+export interface MappingCheckResult {
+  hasViolation: boolean;
+  violation?: string;
+  recommendation?: string;
+}
+
+/**
+ * Check if there's a Mapping Rule violation.
+ * Violation: Generic page ranking for geo query.
+ */
+export function checkMappingRule(
+  pageUrl: string,
+  query: string
+): MappingCheckResult {
+  const pageType = detectPageType(pageUrl);
+  const isGeo = isGeoQuery(query);
+
+  if (pageType === 'GENERIC' && isGeo) {
+    return {
+      hasViolation: true,
+      violation: `Generic page "${pageUrl}" is ranking for geo query "${query}"`,
+      recommendation: 'Unmap and Create: Remove generic page from geo-grid, create dedicated location page',
+    };
+  }
+
+  return { hasViolation: false };
+}
+
+// =============================================================================
+// QUEUE ENFORCEMENT
+// =============================================================================
+
+/**
+ * Get the appropriate queue timeline based on current date.
+ */
+export function getQueueTimeline(): {
+  currentQuarter: string;
+  nextAvailableQuarter: string;
+  monthsOut: number;
 } {
-  const errors: string[] = []
-  const warnings: string[] = []
+  const now = new Date();
+  const currentMonth = now.getMonth(); // 0-11
+  const currentYear = now.getFullYear();
 
-  // Check for data threshold
-  if (!context.data_threshold) {
-    warnings.push('Data threshold not checked. Trend analysis may be unreliable.')
-  } else if (!context.data_threshold.has_minimum) {
-    warnings.push(
-      `Only ${context.data_threshold.days_of_data} days of data available. Trend analysis requires ${context.data_threshold.minimum_required} days.`
-    )
+  // Determine current quarter
+  const currentQ = Math.floor(currentMonth / 3) + 1;
+  const currentQuarter = `Q${currentQ} ${currentYear}`;
+
+  // Calculate next available (3 months out)
+  const targetMonth = currentMonth + HANDBOOK_RULES.QUEUE_LEAD_TIME_MONTHS;
+  const targetQ = Math.floor(targetMonth / 3) + 1;
+  const targetYear = targetMonth >= 12 ? currentYear + 1 : currentYear;
+  const adjustedQ = targetMonth >= 12 ? targetQ - 4 : targetQ;
+
+  const nextAvailableQuarter = `Q${adjustedQ > 0 ? adjustedQ : adjustedQ + 4} ${targetYear}`;
+
+  return {
+    currentQuarter,
+    nextAvailableQuarter,
+    monthsOut: HANDBOOK_RULES.QUEUE_LEAD_TIME_MONTHS,
+  };
+}
+
+/**
+ * Format a strategy recommendation with queue context.
+ */
+export function formatQueuedRecommendation(strategy: string): string {
+  const { nextAvailableQuarter, monthsOut } = getQueueTimeline();
+
+  return `${strategy} (Queue for ${nextAvailableQuarter}, ~${monthsOut} months)`;
+}
+
+// =============================================================================
+// VALIDATION HELPERS
+// =============================================================================
+
+/**
+ * Validate all Handbook constraints for a recommendation.
+ */
+export function validateRecommendation(
+  strategy: string,
+  pageMetadata?: PageMetadata,
+  query?: string
+): {
+  isValid: boolean;
+  violations: string[];
+  warnings: string[];
+} {
+  const violations: string[] = [];
+  const warnings: string[] = [];
+
+  // Check 9-month rule for Content Refresh
+  if (strategy.toLowerCase().includes('content refresh')) {
+    const nineMonthCheck = checkNineMonthRule(pageMetadata);
+    if (nineMonthCheck.isLocked) {
+      violations.push(`9-Month Rule Violation: ${nineMonthCheck.reason}`);
+    }
   }
 
-  // Check for cache freshness
-  if (!context.cache_freshness) {
-    warnings.push('Cache freshness not checked. Data may be stale.')
-  } else if (context.cache_freshness.is_stale) {
-    warnings.push('GSC data is stale (>12 hours old).')
-  }
-
-  // Check for service tier
-  if (!context.service_tier) {
-    warnings.push('Service tier unknown. Cannot validate entitlements.')
+  // Check mapping rule
+  if (pageMetadata?.url && query) {
+    const mappingCheck = checkMappingRule(pageMetadata.url, query);
+    if (mappingCheck.hasViolation && !strategy.toLowerCase().includes('unmap')) {
+      warnings.push(`Mapping Warning: ${mappingCheck.violation}`);
+    }
   }
 
   return {
-    valid: errors.length === 0,
-    errors,
+    isValid: violations.length === 0,
+    violations,
     warnings,
+  };
+}
+
+// =============================================================================
+// CONTEXT BUILDERS
+// =============================================================================
+
+/**
+ * Build constraint context for AI prompt.
+ */
+export function buildConstraintContext(
+  pageMetadata?: PageMetadata,
+  query?: string
+): string {
+  const sections: string[] = [];
+
+  // 9-Month Rule status
+  const nineMonthCheck = checkNineMonthRule(pageMetadata);
+  sections.push(`## 9-Month Rule Status
+- Locked: ${nineMonthCheck.isLocked ? 'YES' : 'NO'}
+- Reason: ${nineMonthCheck.reason}
+${nineMonthCheck.isLocked ? '⚠️ Content Refresh is NOT available. Consider Digital PR instead.' : '✓ Content Refresh is available if needed.'}`);
+
+  // Queue timeline
+  const queue = getQueueTimeline();
+  sections.push(`## Queue Timeline
+- Current Quarter: ${queue.currentQuarter}
+- Next Available: ${queue.nextAvailableQuarter}
+- All content work should be scheduled ${queue.monthsOut}+ months out`);
+
+  // Mapping check (if we have both URL and query)
+  if (pageMetadata?.url && query) {
+    const mappingCheck = checkMappingRule(pageMetadata.url, query);
+    if (mappingCheck.hasViolation) {
+      sections.push(`## ⚠️ Mapping Rule Violation Detected
+${mappingCheck.violation}
+Recommended Strategy: ${mappingCheck.recommendation}`);
+    }
   }
+
+  return sections.join('\n\n');
 }

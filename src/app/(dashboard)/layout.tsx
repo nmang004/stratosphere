@@ -1,23 +1,23 @@
-import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
-import { Sidebar } from '@/components/dashboard/Sidebar'
-import { TopNav } from '@/components/dashboard/TopNav'
-import { FloatingAIChat } from '@/components/shared/FloatingAIChat'
-import { ensureClientAssignments } from '@/lib/utils/assignClients'
+import { redirect } from 'next/navigation';
+import { createClient } from '@/lib/supabase/server';
+import { Sidebar } from '@/components/dashboard/Sidebar';
+import { TopNav } from '@/components/dashboard/TopNav';
 
 export default async function DashboardLayout({
   children,
 }: {
-  children: React.ReactNode
+  children: React.ReactNode;
 }) {
-  const supabase = await createClient()
+  const supabase = await createClient();
 
   // Get the authenticated user
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   // If not authenticated, redirect to login (backup to middleware)
   if (!user) {
-    redirect('/login')
+    redirect('/login');
   }
 
   // Fetch user profile
@@ -25,16 +25,11 @@ export default async function DashboardLayout({
     .from('user_profiles')
     .select('*')
     .eq('id', user.id)
-    .single()
+    .single();
 
   // If no profile, redirect to onboarding
   if (!userProfile) {
-    redirect('/onboarding')
-  }
-
-  // Dev mode: Ensure user has client assignments (auto-assign all clients)
-  if (process.env.NODE_ENV === 'development') {
-    await ensureClientAssignments(user.id)
+    redirect('/onboarding');
   }
 
   return (
@@ -49,14 +44,9 @@ export default async function DashboardLayout({
 
         {/* Page content */}
         <main className="flex-1 overflow-auto bg-background">
-          <div className="p-4 md:p-6">
-            {children}
-          </div>
+          <div className="p-4 md:p-6">{children}</div>
         </main>
       </div>
-
-      {/* Floating AI Chat */}
-      <FloatingAIChat />
     </div>
-  )
+  );
 }

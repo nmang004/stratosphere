@@ -1,39 +1,30 @@
-'use client'
+'use client';
 
-import Link from 'next/link'
-import { usePathname } from 'next/navigation'
-import { cn } from '@/lib/utils'
-import { Button } from '@/components/ui/button'
-import {
-  Home,
-  Users,
-  AlertTriangle,
-  FileText,
-  Settings,
-} from 'lucide-react'
-import type { UserProfile } from '@/types/database'
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { Search, Settings } from 'lucide-react';
+import type { UserProfile } from '@/types/database';
 
 const NAV_ITEMS = [
-  { label: 'Dashboard', icon: Home, path: '/' },
-  { label: 'Clients', icon: Users, path: '/clients' },
-  { label: 'Triage', icon: AlertTriangle, path: '/triage' },
-  { label: 'Reports', icon: FileText, path: '/reports' },
+  { label: 'Forensics Console', icon: Search, path: '/' },
   { label: 'Settings', icon: Settings, path: '/settings' },
-]
+];
 
 interface SidebarProps {
-  user: UserProfile
+  user: UserProfile;
 }
 
 export function Sidebar({ user }: SidebarProps) {
-  const pathname = usePathname()
+  const pathname = usePathname();
 
   const isActive = (path: string) => {
     if (path === '/') {
-      return pathname === '/'
+      return pathname === '/';
     }
-    return pathname.startsWith(path)
-  }
+    return pathname.startsWith(path);
+  };
 
   return (
     <aside className="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0 border-r bg-sidebar-background">
@@ -41,7 +32,7 @@ export function Sidebar({ user }: SidebarProps) {
         {/* Logo */}
         <div className="px-4 py-6 border-b">
           <h1 className="text-xl font-bold text-sidebar-foreground">Stratosphere</h1>
-          <p className="text-xs text-sidebar-foreground/60">Strategy from above.</p>
+          <p className="text-xs text-sidebar-foreground/60">Forensics Console</p>
         </div>
 
         {/* Navigation */}
@@ -52,7 +43,8 @@ export function Sidebar({ user }: SidebarProps) {
               variant="ghost"
               className={cn(
                 'w-full justify-start gap-3 text-sidebar-foreground/80 hover:text-sidebar-foreground hover:bg-sidebar-accent',
-                isActive(item.path) && 'bg-sidebar-accent text-sidebar-foreground font-medium'
+                isActive(item.path) &&
+                  'bg-sidebar-accent text-sidebar-foreground font-medium'
               )}
               asChild
             >
@@ -81,26 +73,26 @@ export function Sidebar({ user }: SidebarProps) {
         </div>
       </div>
     </aside>
-  )
+  );
 }
 
 // Mobile sidebar content (used in Sheet)
 export function SidebarContent({ user }: SidebarProps) {
-  const pathname = usePathname()
+  const pathname = usePathname();
 
   const isActive = (path: string) => {
     if (path === '/') {
-      return pathname === '/'
+      return pathname === '/';
     }
-    return pathname.startsWith(path)
-  }
+    return pathname.startsWith(path);
+  };
 
   return (
     <div className="flex flex-col h-full">
       {/* Logo */}
       <div className="px-4 py-6 border-b">
         <h1 className="text-xl font-bold">Stratosphere</h1>
-        <p className="text-xs text-muted-foreground">Strategy from above.</p>
+        <p className="text-xs text-muted-foreground">Forensics Console</p>
       </div>
 
       {/* Navigation */}
@@ -132,12 +124,10 @@ export function SidebarContent({ user }: SidebarProps) {
             </span>
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium truncate">
-              {user.display_name}
-            </p>
+            <p className="text-sm font-medium truncate">{user.display_name}</p>
           </div>
         </div>
       </div>
     </div>
-  )
+  );
 }
