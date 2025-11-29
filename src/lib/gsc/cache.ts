@@ -13,13 +13,18 @@
  * - > 20h: "[Warning: Data approaching expiration. Refresh recommended.]"
  */
 
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { CacheOptions, CacheInfo, CachedGSCResponse } from './types';
 import { Database, Json } from '@/types/database';
 import crypto from 'crypto';
 
 type GscCacheLog = Database['public']['Tables']['gsc_cache_logs']['Row'];
 type GscCacheLogInsert = Database['public']['Tables']['gsc_cache_logs']['Insert'];
+
+// Use admin client for cache write operations (bypasses RLS)
+async function getAdminClient() {
+  return createAdminClient();
+}
 
 // Default cache duration: 24 hours
 const DEFAULT_CACHE_HOURS = 24;
@@ -174,6 +179,7 @@ export async function getCachedData<T>(
 
 /**
  * Store data in cache
+ * Uses admin client to bypass RLS for server-side caching
  */
 export async function setCachedData<T>(
   clientId: string,
@@ -181,7 +187,7 @@ export async function setCachedData<T>(
   data: T,
   maxAgeHours: number = DEFAULT_CACHE_HOURS
 ): Promise<CacheInfo> {
-  const supabase = await createClient();
+  const supabase = await getAdminClient();
 
   const now = new Date();
   const expiresAt = new Date(now.getTime() + maxAgeHours * 60 * 60 * 1000);
@@ -220,12 +226,13 @@ export async function setCachedData<T>(
 
 /**
  * Invalidate cache for a client
+ * Uses admin client to bypass RLS for server-side cache management
  */
 export async function invalidateCache(
   clientId: string,
   endpointSignature?: string
 ): Promise<void> {
-  const supabase = await createClient();
+  const supabase = await getAdminClient();
 
   const query = supabase
     .from('gsc_cache_logs')
@@ -389,9 +396,10 @@ export async function getClientCacheEntries(clientId: string): Promise<
 
 /**
  * Clean up expired cache entries (run periodically)
+ * Uses admin client to bypass RLS for server-side cache management
  */
 export async function cleanupExpiredCache(): Promise<number> {
-  const supabase = await createClient();
+  const supabase = await getAdminClient();
 
   const { data, error } = await supabase
     .from('gsc_cache_logs')

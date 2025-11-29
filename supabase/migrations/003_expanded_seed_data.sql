@@ -31,7 +31,8 @@ VALUES
     -- Declining trend, active experiment
     ('c8888888-8888-8888-8888-888888888888', 'CreativeStudio', 'creativestudio.design', 'sc-domain:creativestudio.design', 42, 'Design Services', 'America/New_York', true,
      'Creative, inspiring, visual-first. Emphasize portfolio and artistic excellence.',
-     'Health trending down (48→42 over 7 days). Running title tag experiment to improve CTR.');
+     'Health trending down (48→42 over 7 days). Running title tag experiment to improve CTR.')
+ON CONFLICT (id) DO NOTHING;
 
 -- =============================================================================
 -- CLIENT ENTITLEMENTS FOR NEW CLIENTS

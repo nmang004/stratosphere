@@ -11,12 +11,17 @@
  * - Stagger: 2s between client fetches
  */
 
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { RateLimitConfig, QuotaStatus } from './types';
 import { Database } from '@/types/database';
 
 type ApiQuotaTracking = Database['public']['Tables']['api_quota_tracking']['Row'];
 type ApiQuotaTrackingInsert = Database['public']['Tables']['api_quota_tracking']['Insert'];
+
+// Use admin client for quota operations (bypasses RLS)
+async function getAdminClient() {
+  return createAdminClient();
+}
 
 // =============================================================================
 // CONFIGURATION
@@ -43,9 +48,10 @@ const DEFAULT_DAILY_QUOTA = 25000;
 
 /**
  * Check current quota status for a client
+ * Uses admin client to bypass RLS for server-side quota tracking
  */
 export async function checkQuota(clientId: string): Promise<QuotaStatus> {
-  const supabase = await createClient();
+  const supabase = await getAdminClient();
   const today = new Date().toISOString().split('T')[0];
 
   const { data, error } = await supabase
@@ -81,13 +87,14 @@ export async function checkQuota(clientId: string): Promise<QuotaStatus> {
 
 /**
  * Track quota usage after an API call
+ * Uses admin client to bypass RLS for server-side quota tracking
  */
 export async function trackQuotaUsage(
   clientId: string,
   apiType: 'GSC' | 'SERPER' | 'GEMINI' = 'GSC',
   count: number = 1
 ): Promise<void> {
-  const supabase = await createClient();
+  const supabase = await getAdminClient();
   const today = new Date().toISOString().split('T')[0];
 
   // Upsert quota tracking record
