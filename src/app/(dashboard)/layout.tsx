@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { Sidebar } from '@/components/dashboard/Sidebar'
 import { TopNav } from '@/components/dashboard/TopNav'
+import { FloatingAIChat } from '@/components/shared/FloatingAIChat'
 import { ensureClientAssignments } from '@/lib/utils/assignClients'
 
 export default async function DashboardLayout({
@@ -53,6 +54,9 @@ export default async function DashboardLayout({
           </div>
         </main>
       </div>
+
+      {/* Floating AI Chat */}
+      <FloatingAIChat />
     </div>
   )
 }

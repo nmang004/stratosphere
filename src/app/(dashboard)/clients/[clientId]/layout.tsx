@@ -12,9 +12,10 @@ import { useClientDetail } from '@/lib/hooks/useClients'
 import { EntitlementsBadge } from '@/components/clients/EntitlementsBadge'
 import { ChurnRiskIndicator } from '@/components/clients/ChurnRiskIndicator'
 import { LogTouchpointModal } from '@/components/clients/LogTouchpointModal'
+import { AIDraftPanel } from '@/components/shared/AIDraftPanel'
+import { AIChatTrigger } from '@/components/shared/AIChatPanel'
 import {
   ChevronLeft,
-  Mail,
   TrendingUp,
   TrendingDown,
   Minus,
@@ -26,6 +27,7 @@ const TABS = [
   { value: 'overview', label: 'Overview', href: '' },
   { value: 'health', label: 'Health History', href: '/health' },
   { value: 'touchpoints', label: 'Touchpoints', href: '/touchpoints' },
+  { value: 'serp', label: 'SERP Analysis', href: '/serp' },
   { value: 'gsc', label: 'GSC Data', href: '/gsc', disabled: true },
   { value: 'experiments', label: 'Experiments', href: '/experiments', disabled: true },
 ]
@@ -45,6 +47,7 @@ export default function ClientDetailLayout({
   const getActiveTab = () => {
     if (pathname.endsWith('/health')) return 'health'
     if (pathname.endsWith('/touchpoints')) return 'touchpoints'
+    if (pathname.endsWith('/serp')) return 'serp'
     if (pathname.endsWith('/gsc')) return 'gsc'
     if (pathname.endsWith('/experiments')) return 'experiments'
     return 'overview'
@@ -163,10 +166,14 @@ export default function ClientDetailLayout({
 
             {/* Quick actions */}
             <div className="flex flex-wrap items-center gap-2">
-              <Button variant="outline" size="sm" className="gap-1" disabled>
-                <Mail className="h-4 w-4" />
-                Draft Email
-              </Button>
+              <AIChatTrigger
+                clientId={clientId}
+                clientName={client?.name}
+              />
+              <AIDraftPanel
+                clientId={clientId}
+                clientName={client?.name || 'Client'}
+              />
               <LogTouchpointModal clientId={clientId} />
               <Button variant="outline" size="sm" className="gap-1" disabled>
                 <FileText className="h-4 w-4" />
