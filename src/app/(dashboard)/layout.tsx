@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { Sidebar } from '@/components/dashboard/Sidebar'
 import { TopNav } from '@/components/dashboard/TopNav'
+import { ensureClientAssignments } from '@/lib/utils/assignClients'
 
 export default async function DashboardLayout({
   children,
@@ -28,6 +29,11 @@ export default async function DashboardLayout({
   // If no profile, redirect to onboarding
   if (!userProfile) {
     redirect('/onboarding')
+  }
+
+  // Dev mode: Ensure user has client assignments (auto-assign all clients)
+  if (process.env.NODE_ENV === 'development') {
+    await ensureClientAssignments(user.id)
   }
 
   return (

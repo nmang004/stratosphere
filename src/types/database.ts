@@ -412,6 +412,76 @@ export interface Database {
           feedback_text?: string | null
         }
       }
+      client_touchpoints: {
+        Row: {
+          id: string
+          client_id: string
+          touchpoint_type: TouchpointType
+          occurred_at: string
+          source: string | null
+          subject: string | null
+          summary: string | null
+          sentiment_score: number | null
+          metadata: Json | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          client_id: string
+          touchpoint_type: TouchpointType
+          occurred_at: string
+          source?: string | null
+          subject?: string | null
+          summary?: string | null
+          sentiment_score?: number | null
+          metadata?: Json | null
+          created_at?: string
+        }
+        Update: {
+          touchpoint_type?: TouchpointType
+          occurred_at?: string
+          source?: string | null
+          subject?: string | null
+          summary?: string | null
+          sentiment_score?: number | null
+          metadata?: Json | null
+        }
+      }
+      client_contracts: {
+        Row: {
+          id: string
+          client_id: string
+          contract_start: string
+          contract_end: string
+          monthly_value: number | null
+          auto_renew: boolean
+          renewal_notice_days: number | null
+          contract_terms: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          client_id: string
+          contract_start: string
+          contract_end: string
+          monthly_value?: number | null
+          auto_renew?: boolean
+          renewal_notice_days?: number | null
+          contract_terms?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          contract_start?: string
+          contract_end?: string
+          monthly_value?: number | null
+          auto_renew?: boolean
+          renewal_notice_days?: number | null
+          contract_terms?: string | null
+          updated_at?: string
+        }
+      }
     }
     Views: {
       [_ in never]: never
@@ -484,6 +554,11 @@ export type ChurnPrediction = Database['public']['Tables']['churn_prediction_sco
 export type CalendarEvent = Database['public']['Tables']['calendar_events']['Row']
 export type GscAggregate = Database['public']['Tables']['gsc_aggregates']['Row']
 export type AiInteractionLog = Database['public']['Tables']['ai_interaction_logs']['Row']
+export type ClientTouchpoint = Database['public']['Tables']['client_touchpoints']['Row']
+export type ClientTouchpointInsert = Database['public']['Tables']['client_touchpoints']['Insert']
+export type ClientContract = Database['public']['Tables']['client_contracts']['Row']
+export type ServiceTier = Database['public']['Tables']['service_tiers']['Row']
+export type ClientEntitlement = Database['public']['Tables']['client_entitlements']['Row']
 
 // Extended types with joins
 export interface ClientWithHealth extends Client {
@@ -494,8 +569,21 @@ export interface ClientWithHealth extends Client {
 
 export interface ClientWithEntitlements extends Client {
   entitlements?: {
-    tier: Database['public']['Tables']['service_tiers']['Row'] | null
+    tier: ServiceTier | null
     custom_exclusions: string[]
     custom_inclusions: string[]
   }
+}
+
+// Full client detail type with all related data
+export interface ClientDetail extends Client {
+  latest_health?: ClientHealthHistory | null
+  churn_prediction?: ChurnPrediction | null
+  contract?: ClientContract | null
+  entitlements?: {
+    tier: ServiceTier | null
+    custom_exclusions: string[]
+    custom_inclusions: string[]
+  } | null
+  active_alert_count?: number
 }

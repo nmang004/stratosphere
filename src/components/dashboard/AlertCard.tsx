@@ -11,8 +11,11 @@ import {
   formatRelativeTime,
 } from '@/lib/utils/alerts'
 import type { AlertWithClient } from '@/lib/hooks/useAlerts'
+import type { Alert } from '@/types/database'
 import { ExternalLink } from 'lucide-react'
 
+// AlertCard accepts AlertWithClient (which has clients joined)
+// The callbacks use the same type for type safety
 interface AlertCardProps {
   alert: AlertWithClient
   onDismiss?: (alert: AlertWithClient) => void
